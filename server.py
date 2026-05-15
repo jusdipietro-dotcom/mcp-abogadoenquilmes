@@ -224,56 +224,52 @@ async def list_jurisprudence_filters() -> dict:
 @mcp.tool()
 async def list_my_cases(
     search: str | None = None,
-    estado: str | None = None,
     page: int = 1,
-    limit: int = 20,
+    limit: int = 50,
 ) -> dict:
-    """Lista las causas judiciales propias (suscripción activa en causas.abogadoenquilmes).
+    """Lista las causas judiciales del estudio (MEV/SCBA + PJN nacional).
 
-    Cada causa incluye carátula, expediente, juzgado, estado y los últimos movimientos.
-    Requiere que siteai-app exponga /api/causas/mcp-list con service-token.
+    Devuelve causas con carátula, expediente, juzgado, fechas, próxima audiencia.
+    Backend: causas-dashboard-mev → tabla `causas` en siteai-db.
 
     Args:
-        search: match parcial en caratula/nroExpediente/courtName.
-        estado: "En Letra", "A Despacho", etc.
+        search: match parcial case-insensitive en caratula, nro_expediente o juzgado.
         page: 1-indexed.
-        limit: 1-100.
+        limit: 1-200, default 50.
 
     Returns:
-        { cases: [{ id, caratula, nroExpediente, estado, courtName, fechaInicio,
-        totalMovimientos, scrapedAt, movimientos }], total, page, limit, totalPages,
-        lastScrapeAt, estados }
+        { causas: [{ id, caratula, nro_expediente, juzgado, ultima_actualizacion,
+        notificaciones_sin_leer, ... }], total, page, limit, pages }
     """
     if not CAUSAS_SERVICE_TOKEN:
         raise RuntimeError(
-            "CAUSAS_SERVICE_TOKEN no configurado. Endpoint /api/causas/mcp-list "
-            "todavía no está deployado en siteai-app."
+            "CAUSAS_SERVICE_TOKEN no configurado en el MCP server."
         )
     params: dict[str, Any] = {"page": page, "limit": limit}
     if search:
         params["search"] = search
-    if estado:
-        params["estado"] = estado
-    return await _get_json(_causas(), "/api/causas/mcp-list", params)
+    return await _get_json(_causas(), "/api/mcp/causas", params)
 
 
 @mcp.tool()
-async def get_my_case(case_id: str) -> dict:
-    """Trae una causa propia por id con todos sus movimientos.
+async def get_my_case(causa_id: int) -> dict:
+    """Trae una causa propia con todos sus movimientos cronológicos.
+
+    Cada movimiento incluye fecha, fojas, descripción, texto del proveído,
+    URL al proveído, y (si existe) nota del usuario y análisis IA.
 
     Args:
-        case_id: cuid devuelto por list_my_cases (campo `id`).
+        causa_id: id numérico devuelto por list_my_cases (campo `id`).
 
     Returns:
-        Causa completa con movimientos parseados (array de objetos con fecha,
-        descripcion, tipo).
+        Causa con `movimientos: [{ id, fecha, fojas, descripcion, proveido_url,
+        texto, link_url, nota_usuario?, analisis_ia? }, ...]`
     """
     if not CAUSAS_SERVICE_TOKEN:
         raise RuntimeError(
-            "CAUSAS_SERVICE_TOKEN no configurado. Endpoint /api/causas/mcp-list "
-            "todavía no está deployado en siteai-app."
+            "CAUSAS_SERVICE_TOKEN no configurado en el MCP server."
         )
-    return await _get_json(_causas(), f"/api/causas/mcp-list/{case_id}")
+    return await _get_json(_causas(), f"/api/mcp/causas/{causa_id}")
 
 
 # ---------------------------------------------------------------------------
