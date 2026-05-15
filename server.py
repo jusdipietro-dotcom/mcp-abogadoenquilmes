@@ -21,6 +21,7 @@ from typing import Any
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -41,6 +42,11 @@ if not MCP_API_KEY:
     raise SystemExit("MCP_API_KEY env var is required")
 
 
+_ALLOWED_HOSTS = [h.strip() for h in os.environ.get(
+    "MCP_ALLOWED_HOSTS",
+    "mcp.abogadoenquilmes.com,mcp.abogadoenquilmes.com:443",
+).split(",") if h.strip()]
+
 mcp = FastMCP(
     "abogadoenquilmes",
     instructions=(
@@ -49,6 +55,11 @@ mcp = FastMCP(
         "judiciales activas del usuario en MEV/SCBA. Usá search_jurisprudence "
         "para investigación legal y list_my_cases para revisar el estado de "
         "expedientes propios."
+    ),
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=_ALLOWED_HOSTS,
+        allowed_origins=[f"https://{h.split(':')[0]}" for h in _ALLOWED_HOSTS],
     ),
 )
 
