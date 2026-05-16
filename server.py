@@ -272,6 +272,28 @@ async def get_my_case(causa_id: int) -> dict:
     return await _get_json(_causas(), f"/api/mcp/causas/{causa_id}")
 
 
+@mcp.tool()
+async def batch_ia_status() -> dict:
+    """Estado del worker batch IA que analiza movimientos pendientes.
+
+    El worker corre 24/7 dentro de causas-dashboard (autostart al boot).
+    Usa una cascada Groq (6 modelos free) → Gemini 2.0/2.5 Flash (free) →
+    opcionalmente Anthropic Haiku (si BATCH_IA_ENABLE_ANTHROPIC=true en env).
+
+    Returns:
+        {
+            state: { running, started_at, procesados, errores, ultimo_modelo,
+                     ultimo_error, workers, modelos_uso },
+            total_movimientos, analizados, pendientes, pct_done
+        }
+    """
+    if not CAUSAS_SERVICE_TOKEN:
+        raise RuntimeError(
+            "CAUSAS_SERVICE_TOKEN no configurado en el MCP server."
+        )
+    return await _get_json(_causas(), "/api/mcp/batch-ia/status")
+
+
 # ---------------------------------------------------------------------------
 # Auth + ASGI app
 # ---------------------------------------------------------------------------
