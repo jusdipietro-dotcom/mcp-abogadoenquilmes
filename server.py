@@ -299,18 +299,33 @@ async def batch_ia_status() -> dict:
 # ---------------------------------------------------------------------------
 
 class BearerAuthMiddleware(BaseHTTPMiddleware):
-    """Block any request that doesn't carry the right Bearer token.
+    """Block any request that doesn't carry the right token.
 
-    Exempts /health so EasyPanel / Traefik can probe the container.
+    Accepts the token via:
+      - `Authorization: Bearer <token>` header (preferred — works for Claude Code CLI)
+      - `?api_key=<token>` query string (fallback for clients like Claude on the web
+        that can't attach custom headers when registering an MCP server)
+
+    Exempts /health and / so EasyPanel / Traefik can probe the container.
     """
 
     async def dispatch(self, request: Request, call_next):
         if request.url.path in ("/health", "/"):
             return await call_next(request)
+
+        token = ""
         auth = request.headers.get("authorization", "")
-        if not auth.startswith("Bearer "):
-            return JSONResponse({"error": "missing bearer token"}, status_code=401)
-        if auth[len("Bearer "):].strip() != MCP_API_KEY:
+        if auth.startswith("Bearer "):
+            token = auth[len("Bearer "):].strip()
+        if not token:
+            token = request.query_params.get("api_key", "").strip()
+
+        if not token:
+            return JSONResponse(
+                {"error": "missing bearer token (use Authorization header or ?api_key=)"},
+                status_code=401,
+            )
+        if token != MCP_API_KEY:
             return JSONResponse({"error": "invalid bearer token"}, status_code=401)
         return await call_next(request)
 
